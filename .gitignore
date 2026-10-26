@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+# Never commit real clinical documents. Keep test fixtures synthetic.
+*.real.xml
+real-cda/

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fse": {
+      "command": "npx",
+      "args": ["-y", "@massimiliano-dev/fse-mcp"]
+    }
+  }
+}
