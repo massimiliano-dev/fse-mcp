@@ -39,7 +39,13 @@ export interface PreflightResult {
 }
 
 const HL7_V3_NAMESPACE = 'urn:hl7-org:v3';
-const XINCLUDE_NAMESPACE = 'http://www.w3.org/2001/XInclude';
+/**
+ * Any namespace declaration (prefixed or default) bound to the XInclude namespace. Matching the declaration,
+ * not a bare substring, means a comment or text mentioning the URI is not a false positive, and a default
+ * namespace (`xmlns="…XInclude"` with an unprefixed `<include>`) is still caught.
+ */
+const XINCLUDE_NAMESPACE_DECLARATION =
+  /\bxmlns(?::[\w.-]+)?\s*=\s*(["'])\s*http:\/\/www\.w3\.org\/2001\/XInclude\s*\1/i;
 const NAME_SAFE = /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;
 
 /** Inspects `xml` and reports constructs that must not reach a parser. */
@@ -62,7 +68,7 @@ export function inspectUntrustedXml(xml: string): PreflightResult {
   if (/<!ENTITY/i.test(text)) {
     issues.push(error('ENTITY_FORBIDDEN', 'The document declares XML entities, which are refused.'));
   }
-  if (text.includes(XINCLUDE_NAMESPACE) || /<[A-Za-z0-9_-]+:include[\s/>]/.test(text)) {
+  if (XINCLUDE_NAMESPACE_DECLARATION.test(text) || /<[A-Za-z0-9_-]+:include[\s/>]/.test(text)) {
     issues.push(error('XINCLUDE_FORBIDDEN', 'The document uses XInclude, which is refused.'));
   }
   if (/<\?xml-stylesheet[\s?]/i.test(text)) {

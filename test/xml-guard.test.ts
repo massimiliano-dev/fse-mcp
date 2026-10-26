@@ -36,6 +36,16 @@ describe('inspectUntrustedXml', () => {
     expect(codes(xml)).toContain('XINCLUDE_FORBIDDEN');
   });
 
+  it('refuses XInclude bound as default namespace or with spaced single quotes', () => {
+    const viaDefault =
+      '<ClinicalDocument xmlns="urn:hl7-org:v3"><section><include xmlns="http://www.w3.org/2001/XInclude" ' +
+      'href="file:///etc/passwd"/></section></ClinicalDocument>';
+    const spaced =
+      '<ClinicalDocument xmlns="urn:hl7-org:v3" xmlns:x = \' http://www.w3.org/2001/XInclude \'/>';
+    expect(codes(viaDefault)).toContain('XINCLUDE_FORBIDDEN');
+    expect(codes(spaced)).toContain('XINCLUDE_FORBIDDEN');
+  });
+
   it('warns about stylesheets and schemaLocation without failing', () => {
     const xml =
       '<?xml-stylesheet type="text/xsl" href="http://example.invalid/x.xsl"?>' +
