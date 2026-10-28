@@ -55,9 +55,12 @@ export function registerGenerateSampleCda(server: McpServer, deps: { logger: Log
         synthetic: true,
         xml: buildSampleCda(documentType),
         note:
-          `${SYNTHETIC_MARKER}. A skeleton, not a conformant document: complete the TODOs and the body ` +
-          'sections required by the schematron. Never replace the fictional values with real patient data ' +
-          'while working with a hosted LLM.',
+          (spec.schematronRequirements
+            ? `${SYNTHETIC_MARKER}. As generated it passes the CDA XSD and ${spec.schematron}, but it is still a ` +
+              'skeleton: replace the placeholders listed in its comments and add the clinical content. '
+            : `${SYNTHETIC_MARKER}. A skeleton, not a conformant document: complete the TODOs and the body ` +
+              'sections required by the schematron. ') +
+          'Never replace the fictional values with real patient data while working with a hosted LLM.',
       });
     }),
   );

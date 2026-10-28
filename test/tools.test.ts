@@ -5,14 +5,7 @@ import { MAX_CDA_BYTES, MAX_ERROR_MESSAGE_CHARS, MAX_LOOKUP_QUERY_CHARS } from '
 import { type Logger } from '../src/log.js';
 import { type CdaValidatorPort, unavailableValidator } from '../src/validator-port.js';
 import { inspectUntrustedXml } from '../src/xml-guard.js';
-import {
-  brokenLabCda,
-  completedLabCda,
-  connectInMemory,
-  MINIMAL_CDA,
-  SAXON_INSTALLED,
-  textOf,
-} from './helpers.js';
+import { brokenLabCda, connectInMemory, MINIMAL_CDA, SAXON_INSTALLED, textOf } from './helpers.js';
 
 let session: Awaited<ReturnType<typeof connectInMemory>> | undefined;
 afterEach(async () => {
@@ -164,10 +157,15 @@ describe('validate_cda', () => {
 
 describe('validate_cda with the default validator', () => {
   it.skipIf(!SAXON_INSTALLED)(
-    'passes a complete synthetic lab report against XSD and schematron',
+    'the generated laboratory report passes XSD and schematron with no issues',
     async () => {
+      // The guarantee of generate_sample_cda for referto_laboratorio: no error and not even a warning.
       const { call } = await open();
-      const result = await call('validate_cda', { xml: completedLabCda() });
+      const generated = await call('generate_sample_cda', { documentType: 'referto_laboratorio' });
+      expect(generated.structuredContent?.note).toContain(
+        'passes the CDA XSD and schematronFSE_LAB_v27.1.sch',
+      );
+      const result = await call('validate_cda', { xml: String(generated.structuredContent?.xml) });
       expect(result.structuredContent).toMatchObject({
         status: 'valid',
         valid: true,
@@ -180,35 +178,6 @@ describe('validate_cda with the default validator', () => {
       expect(result.structuredContent?.detail).toMatch(
         /XSD validation passed.*Schematron schematronFSE_LAB_v27\.1\.sch passed\./,
       );
-    },
-  );
-
-  it.skipIf(!SAXON_INSTALLED)(
-    'reports the LAB rules the plain sample skeleton leaves to fill in',
-    async () => {
-      // The skeleton is a starting point, not a conformant report: see completedLabCda for what each rule asks.
-      const { call } = await open();
-      const result = await call('validate_cda', { xml: buildSampleCda('referto_laboratorio') });
-      expect(result.structuredContent).toMatchObject({
-        status: 'invalid',
-        valid: false,
-        checks: { xsd: 'run', schematron: 'run' },
-      });
-      const issues = result.structuredContent?.issues as {
-        ruleId?: string;
-        source: string;
-        location?: string;
-      }[];
-      expect(issues.map((i) => i.ruleId).sort()).toEqual([
-        'ERRORE-31',
-        'ERRORE-38',
-        'ERRORE-b1',
-        'ERRORE-b2',
-      ]);
-      for (const issue of issues) {
-        expect(issue.source).toBe('schematron');
-        expect(issue.location).toMatch(/^\/Q\{urn:hl7-org:v3\}ClinicalDocument\[1\]/);
-      }
     },
   );
 

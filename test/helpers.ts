@@ -42,35 +42,9 @@ export const SAXON_INSTALLED = (() => {
   }
 })();
 
-/**
- * The synthetic laboratory report completed with the three things the skeleton leaves to fill in and that
- * schematronFSE_LAB_v27.1 requires, so that it passes XSD and schematron:
- *
- * - ERRORE-31: `ClinicalDocument` needs at least one `inFulfillmentOf` (the order the report answers).
- * - ERRORE-38: `author/assignedAuthor` needs at least one `telecom`.
- * - ERRORE-b1 / ERRORE-b2: every body `section` needs a `code` from the LAB specialty list (LOINC).
- *
- * Elements are inserted where the CDA XSD sequence expects them. All values are fictional.
- */
-export function completedLabCda(): string {
-  return buildSampleCda('referto_laboratorio')
-    .replace(
-      '  <component>\n    <structuredBody>',
-      '  <inFulfillmentOf>\n    <order>\n' +
-        '      <id root="2.16.840.1.113883.2.9.2.999.4.6" extension="SYNTHETIC-ORDER-0001" assigningAuthorityName="SYNTHETIC"/>\n' +
-        '    </order>\n  </inFulfillmentOf>\n  <component>\n    <structuredBody>',
-    )
-    .replace(/(<assignedAuthor>\n\s*<id [^>]*\/>)/, '$1\n      <telecom use="WP" value="tel:+390000000000"/>')
-    .replace(
-      '<title>SYNTHETIC',
-      '<code code="18719-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="CHIMICA"/>\n' +
-        '          <title>SYNTHETIC',
-    );
-}
-
-/** {@link completedLabCda} with a templateId root other than the national LAB one: schematron ERRORE-4. */
+/** The generated laboratory report with a templateId root other than the national LAB one: ERRORE-4. */
 export function brokenLabCda(): string {
-  return completedLabCda().replace(
+  return buildSampleCda('referto_laboratorio').replace(
     'root="2.16.840.1.113883.2.9.10.1.1"',
     'root="2.16.840.1.113883.2.9.10.1.999"',
   );
