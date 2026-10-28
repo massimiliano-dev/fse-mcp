@@ -3,3 +3,5 @@ coverage
 pnpm-lock.yaml
 CHANGELOG.md
 .changeset/*.md
+# Generated from it-fse-catalogs by skill/scripts/generate-references.ts; reformatting would break --check.
+skill/fse-cda-triage/references

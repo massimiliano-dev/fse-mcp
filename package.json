@@ -49,6 +49,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "inspect": "pnpm build && mcp-inspector node dist/bin.js",
+    "skill:references": "node skill/scripts/generate-references.ts",
+    "skill:zip": "node skill/scripts/build-zip.ts",
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
     "prepublishOnly": "pnpm build"
