@@ -70,6 +70,15 @@
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "@massimiliano-dev/fse-validator": "link:../fse-client/packages/validator"
+  },
+  "peerDependencies": {
+    "@massimiliano-dev/fse-validator": ">=0.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@massimiliano-dev/fse-validator": {
+      "optional": true
+    }
   }
 }

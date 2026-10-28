@@ -24,6 +24,18 @@ export const MAX_HTTP_BODY_BYTES = 5 * 1024 * 1024;
 /** Upper bound for a single validator run. */
 export const VALIDATION_TIMEOUT_MS = 30_000;
 
+/**
+ * Maximum number of validation issues returned per level. libxml2 and the schematrons can report hundreds of
+ * consequences of one mistake; the first few are what a developer acts on.
+ */
+export const MAX_VALIDATION_ISSUES = 50;
+
+/** Maximum length of a single validation message. XSD errors list every expected element and get long. */
+export const MAX_ISSUE_MESSAGE_CHARS = 1_000;
+
+/** Maximum size of a compiled schematron (SaxonJS SEF). The largest official one is a few MiB. */
+export const MAX_SEF_BYTES = 32 * 1024 * 1024;
+
 /** Minimum length of the HTTP bearer token. */
 export const MIN_TOKEN_LENGTH = 32;
 

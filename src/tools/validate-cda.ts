@@ -22,16 +22,33 @@ const issueSchema = z.object({
   source: z.enum(['xsd', 'schematron', 'terminology', 'preflight']),
   ruleId: z.string().optional(),
   message: z.string().describe('Document-derived: may quote the submitted document.'),
+  line: z.number().int().optional(),
   location: z.string().optional(),
 });
 
+const checkState = z.enum([
+  'run',
+  'not_run_preflight_rejected',
+  'not_run_xsd_failed',
+  'skipped_validator_missing',
+  'skipped_catalogs_missing',
+  'skipped_saxon_missing',
+  'skipped_schematron_missing',
+  'skipped_unknown_document_type',
+]);
+
 export const validateCdaOutput = z.object({
-  status: z.enum(['valid', 'invalid', 'rejected_preflight', 'not_implemented']),
+  status: z.enum(['valid', 'invalid', 'rejected_preflight', 'validator_unavailable']),
+  valid: z.boolean().nullable().describe('null when no validation level ran: validity is unknown.'),
   validator: z.string(),
   documentType: z.string().optional(),
+  schematron: z.string().optional(),
   rootElement: z.string().optional(),
+  checks: z
+    .object({ xsd: checkState, schematron: checkState })
+    .describe('Which levels ran. A level that did not run reports no issues, which says nothing about it.'),
   issues: z.array(issueSchema),
-  note: z.string(),
+  detail: z.string().optional(),
   notice: z.string(),
 });
 
@@ -47,9 +64,10 @@ export function registerValidateCda(
       title: 'Validate a CDA2 document',
       description:
         'Checks an HL7 CDA R2 document for the FSE 2.0 gateway locally, without sending it anywhere, and ' +
-        'returns XSD, schematron and terminology issues. Documents with a DOCTYPE, entity declarations or ' +
-        'XInclude are refused. Preview: only the pre-flight checks run until the full validator is wired; ' +
-        'the result status says so. Use only synthetic or anonymised documents.',
+        'returns XSD issues with their line. Documents with a DOCTYPE, entity declarations or XInclude are ' +
+        'refused. XSD validation needs the optional @massimiliano-dev/fse-validator package and an ' +
+        'it-fse-catalogs checkout; schematron is not run yet. The checks field says which levels ran. Use ' +
+        'only synthetic or anonymised documents.',
       inputSchema: validateCdaInput,
       outputSchema: validateCdaOutput,
       annotations: { title: 'Validate a CDA2 document', ...READ_ONLY_ANNOTATIONS },
@@ -62,18 +80,18 @@ export function registerValidateCda(
         ruleId: issue.code,
         message: issue.message,
       }));
-      const base = {
-        validator: deps.validator.name,
-        notice: UNTRUSTED_DATA_NOTICE,
-        ...(preflight.rootElement ? { rootElement: preflight.rootElement } : {}),
-      };
+      const rootElement = preflight.rootElement ? { rootElement: preflight.rootElement } : {};
 
       if (!preflight.ok) {
         return toolResult<ValidateCdaOutput>({
-          ...base,
           status: 'rejected_preflight',
+          valid: false,
+          validator: deps.validator.name,
+          ...rootElement,
+          checks: { xsd: 'not_run_preflight_rejected', schematron: 'not_run_preflight_rejected' },
           issues: preflightIssues,
-          note: 'The document was refused before parsing. Fix the preflight errors and validate again.',
+          detail: 'The document was refused before parsing. Fix the preflight errors and validate again.',
+          notice: UNTRUSTED_DATA_NOTICE,
         });
       }
 
@@ -83,15 +101,17 @@ export function registerValidateCda(
       deps.logger.info('validate_cda completed', { status: result.status, issues: result.issues.length });
 
       return toolResult<ValidateCdaOutput>({
-        ...base,
         status: result.status,
+        valid: result.valid,
+        // Read after the run: the default validator names the catalogs commit once it has loaded them.
+        validator: deps.validator.name,
         ...(result.documentType ? { documentType: result.documentType } : {}),
+        ...(result.schematron ? { schematron: result.schematron } : {}),
+        ...rootElement,
+        checks: result.checks,
         issues: [...preflightIssues, ...result.issues],
-        note:
-          result.status === 'not_implemented'
-            ? 'Full XSD/schematron validation is not implemented yet: only the pre-flight checks ran. ' +
-              'Use explain_schematron_error with the gateway error message in the meantime.'
-            : 'Validation ran locally with bundled rules.',
+        ...(result.detail ? { detail: result.detail } : {}),
+        notice: UNTRUSTED_DATA_NOTICE,
       });
     }),
   );

@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CATALOGS_DIR_ENV } from './fse-validator.js';
 import { HttpConfigError, startHttpServer } from './http.js';
 import { createLogger, type Logger, type LogLevel } from './log.js';
 import { addSecret, redact } from './redact.js';
@@ -33,6 +34,7 @@ Options:
 
 Environment:
   ${TOKEN_ENV}          Bearer token for HTTP mode, at least 32 characters (openssl rand -hex 32).
+  ${CATALOGS_DIR_ENV}   it-fse-catalogs checkout used for XSD validation (with @massimiliano-dev/fse-validator).
 `;
 
 const LOG_LEVELS: readonly LogLevel[] = ['error', 'warn', 'info', 'debug'];

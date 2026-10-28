@@ -21,6 +21,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.13.0)
+      '@massimiliano-dev/fse-validator':
+        specifier: link:../fse-client/packages/validator
+        version: link:../fse-client/packages/validator
       '@modelcontextprotocol/inspector':
         specifier: ^2.12.0
         version: 2.12.0(@types/node@24.19.2)

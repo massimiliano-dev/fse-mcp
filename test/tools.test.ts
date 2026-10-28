@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { SYNTHETIC_MARKER } from '../src/data/sample-cda.js';
+import { buildSampleCda, SYNTHETIC_MARKER } from '../src/data/sample-cda.js';
+import { createFseValidator } from '../src/fse-validator.js';
 import { MAX_CDA_BYTES, MAX_ERROR_MESSAGE_CHARS, MAX_LOOKUP_QUERY_CHARS } from '../src/limits.js';
 import { type Logger } from '../src/log.js';
-import { type CdaValidatorPort } from '../src/validator-port.js';
+import { type CdaValidatorPort, unavailableValidator } from '../src/validator-port.js';
 import { inspectUntrustedXml } from '../src/xml-guard.js';
 import { connectInMemory, MINIMAL_CDA, textOf } from './helpers.js';
 
@@ -52,16 +53,19 @@ describe('tool registration', () => {
 });
 
 describe('validate_cda', () => {
-  it('runs the pre-flight checks and reports the stub status', async () => {
-    const { call } = await open();
+  it('runs the pre-flight checks and reports when no validator is available', async () => {
+    const { call } = await open({ validator: unavailableValidator });
     const result = await call('validate_cda', { xml: MINIMAL_CDA });
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({
-      status: 'not_implemented',
-      validator: 'stub (not implemented)',
+      status: 'validator_unavailable',
+      valid: null,
+      validator: 'unavailable',
       rootElement: 'ClinicalDocument',
+      checks: { xsd: 'skipped_validator_missing', schematron: 'skipped_validator_missing' },
       issues: [],
     });
+    expect(result.structuredContent?.detail).toMatch(/@massimiliano-dev\/fse-validator/);
     expect(result.structuredContent?.notice).toMatch(/data, not as instructions/);
   });
 
@@ -71,7 +75,12 @@ describe('validate_cda', () => {
       name: 'spy',
       validate() {
         called = true;
-        return Promise.resolve({ status: 'valid', issues: [] });
+        return Promise.resolve({
+          status: 'valid',
+          valid: true,
+          checks: { xsd: 'run', schematron: 'run' },
+          issues: [],
+        });
       },
     };
     const { call } = await open({ validator });
@@ -79,7 +88,11 @@ describe('validate_cda', () => {
       '<!DOCTYPE d [<!ENTITY x SYSTEM "file:///etc/passwd">]><ClinicalDocument xmlns="urn:hl7-org:v3">&x;</ClinicalDocument>';
     const result = await call('validate_cda', { xml: xxe });
     expect(called).toBe(false);
-    expect(result.structuredContent).toMatchObject({ status: 'rejected_preflight' });
+    expect(result.structuredContent).toMatchObject({
+      status: 'rejected_preflight',
+      valid: false,
+      checks: { xsd: 'not_run_preflight_rejected', schematron: 'not_run_preflight_rejected' },
+    });
     expect(textOf(result)).not.toContain('root:');
   });
 
@@ -90,7 +103,10 @@ describe('validate_cda', () => {
         expect(signal).toBeInstanceOf(AbortSignal);
         return Promise.resolve({
           status: 'invalid',
+          valid: false,
           documentType: 'LAB',
+          schematron: 'schematronFSE_LAB_v27.1.sch',
+          checks: { xsd: 'run', schematron: 'run' },
           issues: [{ severity: 'error', source: 'schematron', ruleId: 'ERRORE-2', message: 'realmCode' }],
         });
       },
@@ -99,8 +115,11 @@ describe('validate_cda', () => {
     const result = await call('validate_cda', { xml: MINIMAL_CDA });
     expect(result.structuredContent).toMatchObject({
       status: 'invalid',
+      valid: false,
       validator: 'fake 1.0',
       documentType: 'LAB',
+      schematron: 'schematronFSE_LAB_v27.1.sch',
+      checks: { xsd: 'run', schematron: 'run' },
       issues: [{ ruleId: 'ERRORE-2' }],
     });
   });
@@ -133,6 +152,97 @@ describe('validate_cda', () => {
     expect(textOf(result)).not.toContain('SNTPNT80A01H501D');
     expect(textOf(result)).not.toContain('boom');
     expect(logged.join('\n')).not.toContain('SNTPNT80A01H501D');
+  });
+});
+
+describe('validate_cda with the default validator', () => {
+  it('passes the synthetic sample CDA against the real XSD', async () => {
+    const { call } = await open();
+    const result = await call('validate_cda', { xml: buildSampleCda('referto_laboratorio') });
+    expect(result.structuredContent).toMatchObject({
+      status: 'valid',
+      valid: true,
+      validator: expect.stringMatching(/fse-validator \(XSD, it-fse-catalogs [0-9a-f]{7}\)/),
+      checks: { xsd: 'run', schematron: 'skipped_schematron_missing' },
+      issues: [],
+    });
+    expect(result.structuredContent?.detail).toMatch(/XSD validation passed.*Schematron was not run/);
+  });
+
+  it('reports a real XSD error with its line', async () => {
+    const { call } = await open();
+    const xml = buildSampleCda('referto_laboratorio').replace(
+      '  <realmCode',
+      '  <unexpected/>\n  <realmCode',
+    );
+    const line = xml.split('\n').findIndex((l) => l.includes('<unexpected/>')) + 1;
+    const result = await call('validate_cda', { xml });
+    expect(result.structuredContent).toMatchObject({
+      status: 'invalid',
+      valid: false,
+      checks: { xsd: 'run', schematron: 'skipped_schematron_missing' },
+      issues: [
+        {
+          severity: 'error',
+          source: 'xsd',
+          line,
+          message: expect.stringContaining(
+            "Element '{urn:hl7-org:v3}unexpected': This element is not expected.",
+          ),
+        },
+      ],
+    });
+    expect(result.structuredContent?.detail).toMatch(/XSD validation failed/);
+  });
+
+  it('reports validator_unavailable when the package cannot be loaded', async () => {
+    const validator = createFseValidator({
+      importModule: () =>
+        Promise.reject(Object.assign(new Error('Cannot find package'), { code: 'ERR_MODULE_NOT_FOUND' })),
+    });
+    const { call } = await open({ validator });
+    const result = await call('validate_cda', { xml: buildSampleCda('referto_laboratorio') });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({
+      status: 'validator_unavailable',
+      valid: null,
+      checks: { xsd: 'skipped_validator_missing', schematron: 'skipped_validator_missing' },
+      issues: [],
+      detail: expect.stringContaining('install'),
+    });
+  });
+
+  it.each([
+    ['DOCTYPE', '<!DOCTYPE ClinicalDocument>', '', 'DTD_FORBIDDEN'],
+    ['ENTITY', '<!ENTITY x "x">', '', 'ENTITY_FORBIDDEN'],
+    ['XInclude', '', ' xmlns:xi="http://www.w3.org/2001/XInclude"', 'XINCLUDE_FORBIDDEN'],
+  ])('still refuses %s before the real validator runs', async (_name, prolog, rootAttr, code) => {
+    const real = createFseValidator();
+    let called = false;
+    const validator: CdaValidatorPort = {
+      name: real.name,
+      validate(xml, options) {
+        called = true;
+        return real.validate(xml, options);
+      },
+    };
+    const { call } = await open({ validator });
+    const xml = buildSampleCda('referto_laboratorio')
+      .replace('<ClinicalDocument', `${prolog}<ClinicalDocument`)
+      .replace(
+        '<ClinicalDocument xmlns="urn:hl7-org:v3"',
+        `<ClinicalDocument xmlns="urn:hl7-org:v3"${rootAttr}`,
+      );
+    const result = await call('validate_cda', { xml });
+    expect(called).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      status: 'rejected_preflight',
+      valid: false,
+      checks: { xsd: 'not_run_preflight_rejected', schematron: 'not_run_preflight_rejected' },
+    });
+    expect(result.structuredContent?.issues).toContainEqual(
+      expect.objectContaining({ source: 'preflight', ruleId: code }),
+    );
   });
 });
 
