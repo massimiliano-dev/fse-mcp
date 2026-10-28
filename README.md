@@ -90,22 +90,21 @@ Pin a version (`@massimiliano-dev/fse-mcp@0.1.0`) if you want upgrades to be del
 is missing is reported in the result (`status: "validator_unavailable"`, or a `checks` level other than `run`)
 instead of failing.
 
-| Piece                             | What it enables                         | How                                                                                                                                                                                      |
-| --------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@massimiliano-dev/fse-validator` | XSD (and the schematron engine wrapper) | Optional peer dependency. **Not on npm yet**: today it is linked from a local [fse-client](https://github.com/massimiliano-dev/fse-client) checkout (`packages/validator`).              |
-| it-fse-catalogs checkout          | XSD                                     | `pnpm sync:catalogs` in fse-client, at the commit pinned by the validator (`d8c766a…`; another commit is refused). Point `FSE_MCP_CATALOGS_DIR` at it.                                   |
-| Compiled schematrons              | Schematron                              | One `<name>.sef.json` per schematron, made with `pnpm compile:schematron` in fse-client. Point `FSE_MCP_SCHEMATRON_DIR` at the folder. Only `schematronFSE_LAB_v27.1` is compiled today. |
-| `saxon-js`                        | Schematron                              | Optional peer dependency, `^2.7.0`. It has a **proprietary licence from Saxonica** (SaxonJS License), so it is never installed by default: read the licence, then add it yourself.       |
+| Piece                             | What it enables                         | How                                                                                                                                                                                |
+| --------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@massimiliano-dev/fse-validator` | XSD (and the schematron engine wrapper) | Optional peer dependency, `^0.1.0`: `npm i @massimiliano-dev/fse-validator`. It ships the official catalogs, so nothing else is needed for XSD.                                    |
+| it-fse-catalogs files             | XSD                                     | Bundled in the validator package at the pinned commit (`d8c766a…`; another commit is refused). Override with `FSE_MCP_CATALOGS_DIR` to use your own checkout.                      |
+| Compiled schematrons              | Schematron                              | Bundled in the validator package; only `schematronFSE_LAB_v27.1` is compiled today. Override the folder with `FSE_MCP_SCHEMATRON_DIR`.                                             |
+| `saxon-js`                        | Schematron                              | Optional peer dependency, `^2.7.0`. It has a **proprietary licence from Saxonica** (SaxonJS License), so it is never installed by default: read the licence, then add it yourself. |
 
 Environment variables:
 
-- `FSE_MCP_CATALOGS_DIR`: the it-fse-catalogs checkout (the folder with the `.fse-catalogs-commit` marker).
-  Default: `fse-client/vendor/it-fse-catalogs` in the folder that contains this repository.
-- `FSE_MCP_SCHEMATRON_DIR`: the folder of compiled schematrons. Default: `fse-client/vendor/schematron-sef` in
-  the same parent folder.
+- `FSE_MCP_CATALOGS_DIR`: an it-fse-catalogs checkout (the folder with the `.fse-catalogs-commit` marker), to
+  use instead of the files bundled in the validator package.
+- `FSE_MCP_SCHEMATRON_DIR`: a folder of compiled schematrons (`<name>.sef.json`), same idea.
 
-The defaults only make sense for a development clone next to fse-client; anywhere else set both variables, for
-example `claude mcp add fse -e FSE_MCP_CATALOGS_DIR=/path/to/it-fse-catalogs -e FSE_MCP_SCHEMATRON_DIR=/path/to/schematron-sef -- npx -y @massimiliano-dev/fse-mcp`.
+Neither is needed in a normal install: without them the validator uses the catalogs it ships with. They are
+there for a development clone next to fse-client, or to pin a different catalogs commit yourself.
 
 How a result reads:
 

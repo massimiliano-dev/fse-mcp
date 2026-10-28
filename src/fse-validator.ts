@@ -80,6 +80,10 @@ interface CheckerLike {
  */
 export interface FseValidatorModule {
   FSE_CATALOGS_COMMIT: string;
+  /** Catalogs shipped inside the published package (since 0.1.0). */
+  bundledCatalogsDir?: () => string;
+  /** Compiled schematrons shipped inside the published package (since 0.1.0). */
+  bundledSchematronSefDir?: () => string;
   UnsafeXmlError: abstract new (...args: never[]) => Error;
   createFseXsdValidator(
     catalogsDir: string,
@@ -99,9 +103,15 @@ export interface FseValidatorModule {
 }
 
 export interface FseValidatorOptions {
-  /** it-fse-catalogs checkout. Defaults to `FSE_MCP_CATALOGS_DIR`, then {@link DEV_CATALOGS_DIR}. */
+  /**
+   * it-fse-catalogs checkout. Defaults to `FSE_MCP_CATALOGS_DIR`, then to the catalogs bundled in
+   * `@massimiliano-dev/fse-validator`, then to {@link DEV_CATALOGS_DIR}.
+   */
   catalogsDir?: string;
-  /** Folder of compiled schematrons (`<name>.sef.json`). Defaults to `FSE_MCP_SCHEMATRON_DIR`, then {@link DEV_SCHEMATRON_DIR}. */
+  /**
+   * Folder of compiled schematrons (`<name>.sef.json`). Defaults to `FSE_MCP_SCHEMATRON_DIR`, then to the
+   * folder bundled in `@massimiliano-dev/fse-validator`, then to {@link DEV_SCHEMATRON_DIR}.
+   */
   schematronDir?: string;
   /** Loads the validator package. Replaced in tests to simulate a missing install. */
   importModule?: () => Promise<FseValidatorModule>;
@@ -128,15 +138,17 @@ interface LevelOutcome {
 
 /** Creates the default validator. Never throws for missing pieces: they surface as skipped levels. */
 export function createFseValidator(options: FseValidatorOptions = {}): CdaValidatorPort {
-  const catalogsDir = options.catalogsDir || process.env[CATALOGS_DIR_ENV] || DEV_CATALOGS_DIR;
-  const schematronDir = options.schematronDir || process.env[SCHEMATRON_DIR_ENV] || DEV_SCHEMATRON_DIR;
+  // Resolved lazily: without an explicit folder the catalogs bundled in the validator package win, and they
+  // are only known once that package is loaded.
+  const explicitCatalogsDir = options.catalogsDir || process.env[CATALOGS_DIR_ENV];
+  const explicitSchematronDir = options.schematronDir || process.env[SCHEMATRON_DIR_ENV];
   const importModule =
     options.importModule ?? (() => import('@massimiliano-dev/fse-validator') as Promise<FseValidatorModule>);
   const importSaxon = options.importSaxon ?? importSaxonJs;
 
   let commit: string | undefined;
   const loadXsd = retryUntilOk(async () => {
-    const loaded = await loadXsdValidator(importModule, catalogsDir);
+    const loaded = await loadXsdValidator(importModule, explicitCatalogsDir);
     if (loaded.ok) commit = loaded.commit;
     return loaded;
   });
@@ -169,10 +181,12 @@ export function createFseValidator(options: FseValidatorOptions = {}): CdaValida
     const schematron = DOCUMENT_TYPE_SPECS[documentType].schematron;
     const sefFile = schematron.replace(/\.sch$/, '.sef.json');
 
-    let loadSef = sefLoaders.get(sefFile);
+    const schematronDir = explicitSchematronDir ?? module.bundledSchematronSefDir?.() ?? DEV_SCHEMATRON_DIR;
+    const sefPath = join(schematronDir, sefFile);
+    let loadSef = sefLoaders.get(sefPath);
     if (!loadSef) {
-      loadSef = retryUntilOk(() => readSef(join(schematronDir, sefFile)));
-      sefLoaders.set(sefFile, loadSef);
+      loadSef = retryUntilOk(() => readSef(sefPath));
+      sefLoaders.set(sefPath, loadSef);
     }
     const sef = await abortable(loadSef(), signal);
     if (!sef.ok) {
@@ -319,7 +333,7 @@ function documentTypeFor(
 
 async function loadXsdValidator(
   importModule: () => Promise<FseValidatorModule>,
-  catalogsDir: string,
+  explicitCatalogsDir: string | undefined,
 ): Promise<Loaded> {
   let module: FseValidatorModule;
   try {
@@ -331,6 +345,7 @@ async function loadXsdValidator(
       loadFailed: (error as { code?: unknown }).code !== 'ERR_MODULE_NOT_FOUND',
     };
   }
+  const catalogsDir = explicitCatalogsDir ?? module.bundledCatalogsDir?.() ?? DEV_CATALOGS_DIR;
   try {
     // One more issue than returned, so that truncation can be detected and reported.
     const xsd = await module.createFseXsdValidator(catalogsDir, {
