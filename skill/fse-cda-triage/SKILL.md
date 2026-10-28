@@ -84,8 +84,9 @@ from the repository this skill comes from: https://github.com/massimiliano-dev/f
 
 - It is separate software that the user installs and runs on their own machine. This skill does not install,
   start or call it on its own.
-- It makes no network calls: schemas and rules are read from a local it-fse-catalogs checkout.
-- XSD validation needs the optional `@massimiliano-dev/fse-validator` package and that checkout.
+- It makes no network calls: schemas and rules are read from files on the user's machine.
+- XSD validation needs the optional `@massimiliano-dev/fse-validator` package (published on npm), which ships
+  the official it-fse-catalogs files at a pinned commit: nothing else to download.
 - Schematron needs the optional `saxon-js` package, which has a **proprietary licence from Saxonica** and is
   therefore not installed by default, plus a compiled schematron for the document type. Today a compiled
   schematron exists only for the laboratory report (`schematronFSE_LAB_v27.1`).

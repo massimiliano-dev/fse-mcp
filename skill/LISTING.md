@@ -65,7 +65,7 @@ No scripts and no executable code are shipped. The skill makes no network calls.
 - Full schematron validation in fse-mcp exists only for the laboratory report, the only schematron compiled so
   far. It also needs the optional `saxon-js` package, which has a proprietary Saxonica licence and is therefore
   not installed by default.
-- The dictionaries behind fse-mcp's `lookup_code` are partial samples, and the catalogs checkout used here
+- The dictionaries behind fse-mcp's `lookup_code` are partial samples, and the bundled catalogs
   contains no terminology files: the code system table says which systems the rules expect, not which codes
   they contain.
 - Passing XSD and schematron locally does not guarantee acceptance: according to the it-fse-catalogs README the
