@@ -1,6 +1,6 @@
 {
   "name": "@massimiliano-dev/fse-mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Unofficial MCP server that explains why a CDA2 document is rejected by Italy's FSE 2.0 gateway: local validation, schematron error explanations, code lookup, synthetic sample CDAs.",
   "license": "MIT",
   "author": "Massimiliano Polce",
