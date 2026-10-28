@@ -5,7 +5,14 @@ import { MAX_CDA_BYTES, MAX_ERROR_MESSAGE_CHARS, MAX_LOOKUP_QUERY_CHARS } from '
 import { type Logger } from '../src/log.js';
 import { type CdaValidatorPort, unavailableValidator } from '../src/validator-port.js';
 import { inspectUntrustedXml } from '../src/xml-guard.js';
-import { connectInMemory, MINIMAL_CDA, textOf } from './helpers.js';
+import {
+  brokenLabCda,
+  completedLabCda,
+  connectInMemory,
+  MINIMAL_CDA,
+  SAXON_INSTALLED,
+  textOf,
+} from './helpers.js';
 
 let session: Awaited<ReturnType<typeof connectInMemory>> | undefined;
 afterEach(async () => {
@@ -156,17 +163,74 @@ describe('validate_cda', () => {
 });
 
 describe('validate_cda with the default validator', () => {
-  it('passes the synthetic sample CDA against the real XSD', async () => {
+  it.skipIf(!SAXON_INSTALLED)(
+    'passes a complete synthetic lab report against XSD and schematron',
+    async () => {
+      const { call } = await open();
+      const result = await call('validate_cda', { xml: completedLabCda() });
+      expect(result.structuredContent).toMatchObject({
+        status: 'valid',
+        valid: true,
+        validator: expect.stringMatching(/fse-validator \(it-fse-catalogs [0-9a-f]{7}\)/),
+        documentType: 'referto_laboratorio',
+        schematron: 'schematronFSE_LAB_v27.1.sch',
+        checks: { xsd: 'run', schematron: 'run' },
+        issues: [],
+      });
+      expect(result.structuredContent?.detail).toMatch(
+        /XSD validation passed.*Schematron schematronFSE_LAB_v27\.1\.sch passed\./,
+      );
+    },
+  );
+
+  it.skipIf(!SAXON_INSTALLED)(
+    'reports the LAB rules the plain sample skeleton leaves to fill in',
+    async () => {
+      // The skeleton is a starting point, not a conformant report: see completedLabCda for what each rule asks.
+      const { call } = await open();
+      const result = await call('validate_cda', { xml: buildSampleCda('referto_laboratorio') });
+      expect(result.structuredContent).toMatchObject({
+        status: 'invalid',
+        valid: false,
+        checks: { xsd: 'run', schematron: 'run' },
+      });
+      const issues = result.structuredContent?.issues as {
+        ruleId?: string;
+        source: string;
+        location?: string;
+      }[];
+      expect(issues.map((i) => i.ruleId).sort()).toEqual([
+        'ERRORE-31',
+        'ERRORE-38',
+        'ERRORE-b1',
+        'ERRORE-b2',
+      ]);
+      for (const issue of issues) {
+        expect(issue.source).toBe('schematron');
+        expect(issue.location).toMatch(/^\/Q\{urn:hl7-org:v3\}ClinicalDocument\[1\]/);
+      }
+    },
+  );
+
+  it.skipIf(!SAXON_INSTALLED)('reports a real schematron error with rule id and location', async () => {
     const { call } = await open();
-    const result = await call('validate_cda', { xml: buildSampleCda('referto_laboratorio') });
+    const result = await call('validate_cda', { xml: brokenLabCda() });
     expect(result.structuredContent).toMatchObject({
-      status: 'valid',
-      valid: true,
-      validator: expect.stringMatching(/fse-validator \(XSD, it-fse-catalogs [0-9a-f]{7}\)/),
-      checks: { xsd: 'run', schematron: 'skipped_schematron_missing' },
-      issues: [],
+      status: 'invalid',
+      valid: false,
+      schematron: 'schematronFSE_LAB_v27.1.sch',
+      checks: { xsd: 'run', schematron: 'run' },
+      issues: [
+        {
+          severity: 'error',
+          source: 'schematron',
+          ruleId: 'ERRORE-4',
+          message: expect.stringMatching(/^ERRORE-4\| Almeno un elemento 'templateId'/),
+          location: '/Q{urn:hl7-org:v3}ClinicalDocument[1]',
+        },
+      ],
     });
-    expect(result.structuredContent?.detail).toMatch(/XSD validation passed.*Schematron was not run/);
+    expect(result.structuredContent?.detail).toContain('failed with 1 issue(s).');
   });
 
   it('reports a real XSD error with its line', async () => {
@@ -180,7 +244,7 @@ describe('validate_cda with the default validator', () => {
     expect(result.structuredContent).toMatchObject({
       status: 'invalid',
       valid: false,
-      checks: { xsd: 'run', schematron: 'skipped_schematron_missing' },
+      checks: { xsd: 'run', schematron: 'not_run_xsd_failed' },
       issues: [
         {
           severity: 'error',
@@ -192,7 +256,8 @@ describe('validate_cda with the default validator', () => {
         },
       ],
     });
-    expect(result.structuredContent?.detail).toMatch(/XSD validation failed/);
+    expect(result.structuredContent?.detail).toMatch(/XSD validation failed.*because the XSD failed/);
+    expect(result.structuredContent).not.toHaveProperty('schematron');
   });
 
   it('reports validator_unavailable when the package cannot be loaded', async () => {

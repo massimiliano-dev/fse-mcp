@@ -24,7 +24,7 @@
   ],
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.19"
   },
   "bin": {
     "fse-mcp": "./dist/bin.js"
@@ -63,21 +63,26 @@
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
+    "@massimiliano-dev/fse-validator": "link:../fse-client/packages/validator",
     "@modelcontextprotocol/inspector": "^2.12.0",
     "@types/node": "^24.0.0",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
+    "saxon-js": "2.7.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5",
-    "@massimiliano-dev/fse-validator": "link:../fse-client/packages/validator"
+    "vitest": "^5.0.5"
   },
   "peerDependencies": {
-    "@massimiliano-dev/fse-validator": ">=0.0.0"
+    "@massimiliano-dev/fse-validator": ">=0.0.0",
+    "saxon-js": "^2.7.0"
   },
   "peerDependenciesMeta": {
     "@massimiliano-dev/fse-validator": {
+      "optional": true
+    },
+    "saxon-js": {
       "optional": true
     }
   }

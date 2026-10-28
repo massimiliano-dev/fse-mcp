@@ -64,10 +64,11 @@ export function registerValidateCda(
       title: 'Validate a CDA2 document',
       description:
         'Checks an HL7 CDA R2 document for the FSE 2.0 gateway locally, without sending it anywhere, and ' +
-        'returns XSD issues with their line. Documents with a DOCTYPE, entity declarations or XInclude are ' +
-        'refused. XSD validation needs the optional @massimiliano-dev/fse-validator package and an ' +
-        'it-fse-catalogs checkout; schematron is not run yet. The checks field says which levels ran. Use ' +
-        'only synthetic or anonymised documents.',
+        'returns XSD issues with their line and, when the XSD passes, schematron issues with their rule id ' +
+        'and location. Documents with a DOCTYPE, entity declarations or XInclude are refused. Needs the ' +
+        'optional @massimiliano-dev/fse-validator package and an it-fse-catalogs checkout; schematron also ' +
+        'needs the optional saxon-js package (proprietary Saxonica licence) and a compiled schematron for the ' +
+        'document type. The checks field says which levels ran. Use only synthetic or anonymised documents.',
       inputSchema: validateCdaInput,
       outputSchema: validateCdaOutput,
       annotations: { title: 'Validate a CDA2 document', ...READ_ONLY_ANNOTATIONS },
